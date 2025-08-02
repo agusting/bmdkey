@@ -38,11 +38,11 @@ static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x07, {XK_F7, false} }, /* IN */
     {0x08, {XK_F8, false} }, /* OUT */
     {0x09, {XK_F9, false} }, /* TRIM IN */
-    {0x0a, {XK_F10, false}}, /* TRIM OUT */
+    {0x0a, {XK_8, false}}, /* TRIM OUT */
     {0x0b, {XK_F11, false}}, /* ROLL */
-    {0x0c, {XK_F12, false}}, /* SLIP SRC */
-    {0x0d, {XK_F13, false}}, /* SLIP DEST */
-    {0x0e, {XK_F14, false}}, /* TRANS DUR */
+    {0x0c, {XK_4, false}}, /* SLIP SRC */
+    {0x0d, {XK_5, false}}, /* SLIP DEST */
+    {0x0e, {XK_6, false}}, /* TRANS DUR */
     {0x0f, {XK_F15, false}}, /* CUT */
     {0x10, {XK_F16, false}}, /* DIS */
     {0x11, {XK_F17, false}}, /* SMTH CUT */
