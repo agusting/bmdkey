@@ -43,10 +43,10 @@ static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x0b, {XK_F11, false}}, /* ROLL */
     {0x0c, {XK_Left, false}}, /* SLIP SRC */
     {0x0d, {XK_Down, false}}, /* SLIP DEST */
-    {0x0e, {XK_Right, true}}, /* TRANS DUR */
+    {0x0e, {XK_Right, false}}, /* TRANS DUR */
     {0x0f, {XK_F15, false}}, /* CUT */
     {0x10, {XK_Shift_L, false}}, /* DIS */
-    {0x11, {XK_KP_Space, false}}, /* SMTH CUT */
+    {0x11, {XK_space, false}}, /* SMTH CUT */
 
     {0x1a, {XK_Alt_L, false}}, /* SOURCE */
     {0x1b, {XK_Control_L, false}}, /* TIMELINE */
@@ -75,7 +75,7 @@ static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x2c, {XK_F19, true} }, /* LIVE O/WR */
     {0x25, {XK_F20, true} }, /* VIDEO ONLY */
     {0x26, {XK_F21, true} }, /* AUDIO ONLY */
-    {0x3c, {XK_KP_Space, true} }, /* STOP/PLAY */
+    {0x3c, {XK_space, true} }, /* STOP/PLAY */
 };
 
 static void checkerror(int res)
