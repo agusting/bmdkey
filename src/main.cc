@@ -26,7 +26,8 @@ static int minKeycode;
 static int maxKeycode;
 static int lastModifiedKey = 0;
 
-static const std::vector<KeySym> MODIFIERS = {XK_Alt_L, XK_Meta_L, XK_Super_L}; 
+static const std::vector<KeySym> MODIFIERS = {XK_Caps_Lock}; 
+/* static const std::vector<KeySym> MODIFIERS = {XK_Alt_L, XK_Meta_L, XK_Super_L}; */
 
 static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x01, {XK_F1, false} }, /* SMART INSRT */
