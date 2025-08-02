@@ -1,17 +1,6 @@
-// --- Preprocessor-based includes ---
-#ifdef _WIN32
-#include <windows.h>
-#else // For Linux
-#include <unistd.h>
-#include <fakekey/fakekey.h>
-#include <X11/Xlib.h>
-#include <X11/Xatom.h>
-#include <X11/extensions/XTest.h> // Needed for XTestFakeButtonEvent
-#endif
-
-// --- Common includes ---
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <exception>
 #include <vector>
 #include <set>
@@ -21,159 +10,204 @@
 #include <chrono>
 #include <hidapi.h>
 #include <fmt/format.h>
+#include <fakekey/fakekey.h>
+#include <X11/Xlib.h>
+#include <X11/Xatom.h>
+#include <X11/extensions/XTest.h> // Required for mouse wheel simulation
 
-// --- Constants ---
+#define WHEEL_STEP 30000
 #define TIMEOUT_MS (60 * 1000)
 
-// --- Global State ---
+// --- X11 Global Variables ---
+static Display* display;
+static FakeKey* fakekey;
 static std::set<uint16_t> currentKeyboardState;
-
-// --- Platform-Specific Definitions ---
-#ifdef _WIN32 // WINDOWS
-// --- Windows Virtual-Key Code Mappings ---
-static const std::vector<WORD> MODIFIERS = {VK_LMENU, VK_LWIN}; // Left Alt, Left Windows Key
-static const std::map<int, std::pair<WORD, bool>> KEYMAP = {
-    // ... (Windows KEYMAP from the previous answer) ...
-    {0x01, {VK_F1, false}}, {0x02, {VK_F2, false}}, {0x03, {VK_F3, false}},
-    {0x04, {VK_F4, false}}, {0x05, {VK_F5, false}}, {0x06, {VK_F6, false}},
-    {0x07, {VK_F7, false}}, {0x08, {VK_F8, false}}, {0x09, {VK_F9, false}},
-    {0x0a, {VK_UP, false}}, {0x0b, {VK_F11, false}}, {0x0c, {VK_LEFT, true}},
-    {0x0d, {VK_DOWN, false}}, {0x0e, {VK_RIGHT, true}}, {0x0f, {VK_F15, false}},
-    {0x10, {VK_F16, false}}, {0x11, {VK_F17, false}}, {0x1a, {VK_F18, false}},
-    {0x1b, {VK_F19, false}}, {0x1c, {VK_F20, false}}, {0x1d, {VK_F21, false}},
-    {0x1e, {VK_F22, false}}, {0x31, {VK_F1, true}}, {0x1f, {VK_F2, true}},
-    {0x2c, {VK_F3, true}}, {0x2d, {VK_F4, true}}, {0x22, {VK_F5, true}},
-    {0x2f, {VK_F6, true}}, {0x2e, {VK_F7, true}}, {0x2b, {VK_F8, true}},
-    {0x33, {VK_F10, true}}, {0x34, {VK_F11, true}}, {0x35, {VK_F12, true}},
-    {0x36, {VK_F13, true}}, {0x37, {VK_F14, true}}, {0x38, {VK_F15, true}},
-    {0x39, {VK_F16, true}}, {0x3a, {VK_F17, true}}, {0x3b, {VK_F18, true}},
-    {0x25, {VK_F20, true}}, {0x26, {VK_F21, true}}, {0x3c, {VK_F22, true}},
-};
-#else // LINUX / X11
-// --- Linux X11 Global Variables ---
-static Display *display;
-static FakeKey *fakekey;
 static int minKeycode;
 static int maxKeycode;
+
 // --- X11 KeySym Mappings ---
 static const std::vector<KeySym> MODIFIERS = {XK_Alt_L, XK_Meta_L, XK_Super_L};
+
 static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
-    // ... (Original X11 KEYMAP from your code) ...
-    {0x01, {XK_F1, false}}, {0x02, {XK_F2, false}}, {0x03, {XK_F3, false}},
-    {0x04, {XK_F4, false}}, {0x05, {XK_F5, false}}, {0x06, {XK_F6, false}},
-    {0x07, {XK_F7, false}}, {0x08, {XK_F8, false}}, {0x09, {XK_F9, false}},
-    {0x0a, {XK_Up, false}}, {0x0b, {XK_F11, false}}, {0x0c, {XK_Left, true}},
-    {0x0d, {XK_Down, false}}, {0x0e, {XK_Right, true}}, {0x0f, {XK_F15, false}},
-    {0x10, {XK_F16, false}}, {0x11, {XK_F17, false}}, {0x1a, {XK_F18, false}},
-    {0x1b, {XK_F19, false}}, {0x1c, {XK_F20, false}}, {0x1d, {VK_F21, false}},
-    {0x1e, {VK_F22, false}}, {0x31, {VK_F1, true}}, {0x1f, {VK_F2, true}},
-    {0x2c, {VK_F3, true}}, {0x2d, {VK_F4, true}}, {0x22, {VK_F5, true}},
-    {0x2f, {VK_F6, true}}, {0x2e, {VK_F7, true}}, {0x2b, {VK_F8, true}},
-    {0x33, {VK_F10, true}}, {0x34, {VK_F11, true}}, {0x35, {VK_F12, true}},
-    {0x36, {VK_F13, true}}, {0x37, {VK_F14, true}}, {0x38, {VK_F15, true}},
-    {0x39, {VK_F16, true}}, {0x3a, {VK_F17, true}}, {0x3b, {VK_F18, true}},
-    {0x25, {VK_F20, true}}, {0x26, {VK_F21, true}}, {0x3c, {VK_F22, true}},
+    {0x01, {XK_F1, false}},    /* SMART INSRT */
+    {0x02, {XK_F2, false}},    /* APPEND */
+    {0x03, {XK_F3, false}},    /* RIPL O/WR */
+    {0x04, {XK_F4, false}},    /* CLOSE UP */
+    {0x05, {XK_F5, false}},    /* PLACE ON TOP */
+    {0x06, {XK_F6, false}},    /* SRC O/WR */
+    {0x07, {XK_F7, false}},    /* IN */
+    {0x08, {XK_F8, false}},    /* OUT */
+    {0x09, {XK_F9, false}},    /* TRIM IN */
+    {0x0a, {XK_Up, false}},      /* TRIM OUT */
+    {0x0b, {XK_F11, false}},   /* ROLL */
+    {0x0c, {XK_Left, true}},   /* SLIP SRC */
+    {0x0d, {XK_Down, false}},    /* SLIP DEST */
+    {0x0e, {XK_Right, true}},  /* TRANS DUR */
+    {0x0f, {XK_F15, false}},   /* CUT */
+    {0x10, {XK_F16, false}},   /* DIS */
+    {0x11, {XK_F17, false}},   /* SMTH CUT */
+    {0x1a, {XK_F18, false}},   /* SOURCE */
+    {0x1b, {XK_F19, false}},   /* TIMELINE */
+    {0x1c, {XK_F20, false}},   /* SHTL */
+    {0x1d, {XK_F21, false}},   /* JOG */
+    {0x1e, {XK_F22, false}},   /* SCRL */
+    {0x31, {XK_F1, true}},     /* ESC */
+    {0x1f, {XK_F2, true}},     /* SYNC BIN */
+    {0x2c, {XK_F3, true}},     /* AUDIO LEVEL */
+    {0x2d, {XK_F4, true}},     /* FULL VIEW */
+    {0x22, {XK_F5, true}},     /* TRANS */
+    {0x2f, {XK_F6, true}},     /* SPLIT */
+    {0x2e, {XK_F7, true}},     /* SNAP */
+    {0x2b, {XK_F8, true}},     /* RIPL DEL */
+    {0x33, {XK_F10, true}},    /* CAM1 */
+    {0x34, {XK_F11, true}},    /* CAM2 */
+    {0x35, {XK_F12, true}},    /* CAM3 */
+    {0x36, {XK_F13, true}},    /* CAM4 */
+    {0x37, {XK_F14, true}},    /* CAM5 */
+    {0x38, {XK_F15, true}},    /* CAM6 */
+    {0x39, {XK_F16, true}},    /* CAM7 */
+    {0x3a, {XK_F17, true}},    /* CAM8 */
+    {0x3b, {XK_F18, true}},    /* CAM9 */
+    {0x25, {XK_F20, true}},    /* VIDEO ONLY */
+    {0x26, {XK_F21, true}},    /* AUDIO ONLY */
+    {0x3c, {XK_F22, true}},    /* STOP/PLAY */
 };
-#endif
-
-// --- HIDAPI and Authentication Code (Unchanged and Common to Both Platforms) ---
-// ... (The HidDevice class, authentication logic, getInt helpers, etc. are all here)
-// [This section of your code remains the same]
 
 
-// --- Platform-Specific Input Simulation Functions ---
-#ifdef _WIN32 // WINDOWS
-static void send_key_event(WORD vk, bool pressed) {
-    INPUT input = {0};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = vk;
-    if (!pressed) input.ki.dwFlags = KEYEVENTF_KEYUP;
-    SendInput(1, &input, sizeof(INPUT));
+// --- HIDAPI and Authentication Code (Unchanged) ---
+
+class HidException : public std::exception {
+public:
+    HidException(const std::string& s): _message(s) {}
+    const char* what() const noexcept override { return _message.c_str(); }
+private:
+    std::string _message;
+};
+class TimeoutException : public std::exception {};
+
+static void checkError(int res) {
+    if (res == -1) throw HidException(fmt::format("hidapi error"));
 }
-static void send_mouse_wheel(bool down) {
-    INPUT input = {0};
-    input.type = INPUT_MOUSE;
-    input.mi.dwFlags = MOUSEEVENTF_WHEEL;
-    input.mi.mouseData = down ? -WHEEL_DELTA : WHEEL_DELTA;
-    SendInput(1, &input, sizeof(INPUT));
+static uint64_t getInt16(const uint8_t* p) { return ((uint64_t)p[0] << 0) | ((uint64_t)p[1] << 8); }
+static uint32_t getInt32(const uint8_t* p) { return ((uint32_t)getInt16(p) << 0) | ((uint32_t)getInt16(p + 2) << 16); }
+static uint64_t getInt64(const uint8_t* p) { return ((uint64_t)getInt32(p) << 0) | ((uint64_t)getInt32(p + 4) << 32); }
+static void putInt64(uint8_t* p, uint64_t v) { p[0]=v>>0; p[1]=v>>8; p[2]=v>>16; p[3]=v>>24; p[4]=v>>32; p[5]=v>>40; p[6]=v>>48; p[7]=v>>56; }
+
+static uint64_t rol8(uint64_t v) { return ((v << 56) | (v >> 8)); }
+static uint64_t rol8n(uint64_t v, int n) { while (n--) v = rol8(v); return v; }
+
+static uint64_t calculateKeyboardResponse(uint64_t challenge) {
+    static const uint64_t even_tbl[] = { 0x3ae1206f97c10bc8, 0x2a9ab32bebf244c6, 0x20a6f8b8df9adf0a, 0xaf80ece52cfc1719, 0xec2ee2f7414fd151, 0xb055adfd73344a15, 0xa63d2e3059001187, 0x751bf623f42e0dde };
+    static const uint64_t odd_tbl[] = { 0x3e22b34f502e7fde, 0x24656b981875ab1c, 0xa17f3456df7bf8c3, 0x6df72e1941aef698, 0x72226f011e66ab94, 0x3831a3c606296b42, 0xfd7ff81881332c89, 0x61a3f6474ff236c6 };
+    uint64_t n = challenge & 7;
+    uint64_t v = rol8n(challenge, n);
+    if ((v & 1) == ((0x78 >> n) & 1)) return v ^ (rol8(v) & 0xa79a63f585d37bf0) ^ even_tbl[n];
+    v = v ^ rol8(v);
+    return v ^ (rol8(v) & 0xa79a63f585d37bf0) ^ odd_tbl[n];
 }
-static void press_release_modifiers(bool pressed) {
-    for (WORD vk : MODIFIERS) send_key_event(vk, pressed);
-}
-static void handle_key_event(int keynum, bool pressed) {
-    auto it = KEYMAP.find(keynum);
-    if (it == KEYMAP.end()) return;
-    WORD vk_code = it->second.first;
-    bool needs_shift = it->second.second;
-    if (pressed) {
-        if (needs_shift) send_key_event(VK_SHIFT, true);
-        send_key_event(vk_code, true);
-    } else {
-        send_key_event(vk_code, false);
-        if (needs_shift) send_key_event(VK_SHIFT, false);
+
+class HidDevice {
+public:
+    hid_device* _handle;
+    HidDevice(uint16_t product, uint16_t vendor) {
+        for (;;) {
+            _handle = hid_open(vendor, product, nullptr); // Vendor ID is first!
+            if (_handle) break;
+            fmt::print("Waiting for device...\n");
+            sleep(1);
+        }
+        hid_set_nonblocking(_handle, false);
     }
+    ~HidDevice() { if (_handle) hid_close(_handle); }
+    void send(const std::vector<uint8_t>& data) { checkError(hid_write(_handle, &data[0], data.size())); }
+    void sendFeatureReport(const std::vector<uint8_t>& report) { checkError(hid_send_feature_report(_handle, &report[0], report.size())); }
+    std::vector<uint8_t> recvFeatureReport(int id, int length) {
+        std::vector<uint8_t> data(length);
+        data[0] = id;
+        int res = hid_get_feature_report(_handle, &data[0], data.size());
+        checkError(res);
+        data.resize(res);
+        return data;
+    }
+    std::vector<uint8_t> recv(int msTimeout) {
+        std::vector<uint8_t> data(64);
+        int res = hid_read_timeout(_handle, &data[0], data.size(), msTimeout);
+        if (res == 0) throw TimeoutException();
+        checkError(res);
+        data.resize(res);
+        return data;
+    }
+};
+
+static void authenticate(HidDevice& device) {
+    device.sendFeatureReport({6, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    auto challenge = device.recvFeatureReport(6, 10);
+    device.sendFeatureReport({6, 1, 0, 0, 0, 0, 0, 0, 0, 0});
+    device.recvFeatureReport(6, 10);
+    std::vector<uint8_t> response = {6, 3, 0, 0, 0, 0, 0, 0, 0, 0};
+    putInt64(&response[2], calculateKeyboardResponse(getInt64(&challenge[2])));
+    device.sendFeatureReport(response);
+    auto result = device.recvFeatureReport(6, 10);
+    if ((result.at(0) != 6) || (result.at(1) != 4)) throw HidException("unable to authenticate");
+    fmt::print("Authenticated\n");
 }
-#else // LINUX / X11
-static void send_mouse_wheel(bool down) {
-    int button = down ? 5 : 4; // Button 4 is scroll up, 5 is scroll down
-    XTestFakeButtonEvent(display, button, True, 0);
-    XTestFakeButtonEvent(display, button, False, 0);
-    XFlush(display);
-}
-static void press_release_modifiers(bool pressed) {
+
+
+// --- X11 Input Simulation Functions ---
+
+static void pressReleaseModifiers(bool pressed) {
     for (KeySym keysym : MODIFIERS) {
         fakekey_send_keyevent(fakekey, XKeysymToKeycode(display, keysym), pressed, 0);
     }
     XFlush(display);
 }
-static void handle_key_event(int keynum, bool pressed) {
+
+static void pressReleaseKey(int keynum, bool pressed) {
     auto it = KEYMAP.find(keynum);
     if (it == KEYMAP.end()) return;
+
     KeySym keysym = it->second.first;
-    KeySym keysyms[] = {keysym, keysym};
+    bool needs_shift = it->second.second;
+
     KeyCode code = XKeysymToKeycode(display, keysym);
-    if (!code) {
+    if (!code) { // Dynamically map keysym if it doesn't exist
+        KeySym keysyms[] = {keysym, keysym};
         XChangeKeyboardMapping(display, maxKeycode - 1, 2, keysyms, 1);
         XSync(display, False);
         code = maxKeycode - 1;
     }
-    fakekey_send_keyevent(fakekey, code, pressed, it->second.second ? FAKEKEYMOD_SHIFT : 0);
+    fakekey_send_keyevent(fakekey, code, pressed, needs_shift ? FAKEKEYMOD_SHIFT : 0);
 }
-#endif
 
-// --- Main Application Logic (with platform-specific setup) ---
+
 int main()
 {
-#ifdef _WIN32
-    // Windows atexit handler
-    atexit([]() {
-        for (uint16_t k : currentKeyboardState) handle_key_event(k, false);
-        press_release_modifiers(false);
-    });
-#else
-    // Linux/X11 setup
+    // --- X11 Initialization ---
     display = XOpenDisplay(nullptr);
     if (!display) {
-        fmt::print(stderr, "Cannot open X11 display.\n");
+        fmt::print(stderr, "Error: Cannot open X11 display. Is the DISPLAY environment variable set?\n");
         return 1;
     }
     fakekey = fakekey_init(display);
     XDisplayKeycodes(display, &minKeycode, &maxKeycode);
-    // Linux/X11 atexit handler
+
+    // --- Cleanup Handler ---
     atexit([]() {
-        for (uint16_t k : currentKeyboardState) handle_key_event(k, false);
-        press_release_modifiers(false);
+        for (uint16_t k : currentKeyboardState)
+            pressReleaseKey(k, false);
+        pressReleaseModifiers(false);
         if (fakekey) fakekey_destroy(fakekey);
         if (display) XCloseDisplay(display);
     });
-#endif
 
+    // --- Main Loop ---
     hid_init();
     {
-        HidDevice device(0x1edb, 0xda0e);
+        HidDevice device(0xda0e, 0x1edb); // Product ID, Vendor ID
         authenticate(device);
-        device.send({3, 0, 0, 0, 0, 0, 0});
-        device.send({2, 0xff, 0xff, 0xff, 0xff});
+
+        device.send({3, 0, 0, 0, 0, 0, 0}); // Enable jog wheel
+        device.send({2, 0xff, 0xff, 0xff, 0xff}); // Enable all LEDs
 
         int32_t wheel_accumulator = 0;
         int msTimeout = TIMEOUT_MS;
@@ -189,15 +223,12 @@ int main()
                     case 3: { // Wheel packet
                         int32_t delta = getInt32(&data[2]);
                         wheel_accumulator += delta;
-                        const int WHEEL_STEP_THRESHOLD = 30000;
-                        while (abs(wheel_accumulator) >= WHEEL_STEP_THRESHOLD) {
-                            if (wheel_accumulator > 0) {
-                                send_mouse_wheel(false); // Scroll Up
-                                wheel_accumulator -= WHEEL_STEP_THRESHOLD;
-                            } else {
-                                send_mouse_wheel(true); // Scroll Down
-                                wheel_accumulator += WHEEL_STEP_THRESHOLD;
-                            }
+                        while (abs(wheel_accumulator) >= WHEEL_STEP) {
+                            int button = (wheel_accumulator < 0) ? 5 : 4; // 5=down, 4=up
+                            XTestFakeButtonEvent(display, button, True, 0);
+                            XTestFakeButtonEvent(display, button, False, 0);
+                            XFlush(display);
+                            wheel_accumulator += (wheel_accumulator < 0) ? WHEEL_STEP : -WHEEL_STEP;
                         }
                         break;
                     }
@@ -207,18 +238,20 @@ int main()
                             uint16_t keycode = getInt16(&data[1 + i * 2]);
                             if (keycode) newKeyboardState.insert(keycode);
                         }
+
                         std::set<uint16_t> keysPressed;
                         std::ranges::set_difference(newKeyboardState, currentKeyboardState, std::inserter(keysPressed, keysPressed.begin()));
+
                         std::set<uint16_t> keysReleased;
                         std::ranges::set_difference(currentKeyboardState, newKeyboardState, std::inserter(keysReleased, keysReleased.begin()));
 
                         if (currentKeyboardState.empty() && !newKeyboardState.empty()) {
-                            press_release_modifiers(true);
+                            pressReleaseModifiers(true);
                         }
-                        for (uint16_t k : keysPressed) handle_key_event(k, true);
-                        for (uint16_t k : keysReleased) handle_key_event(k, false);
+                        for (uint16_t k : keysPressed) pressReleaseKey(k, true);
+                        for (uint16_t k : keysReleased) pressReleaseKey(k, false);
                         if (!currentKeyboardState.empty() && newKeyboardState.empty()) {
-                            press_release_modifiers(false);
+                            pressReleaseModifiers(false);
                         }
                         currentKeyboardState = newKeyboardState;
                         break;
@@ -228,10 +261,10 @@ int main()
                         for (uint8_t c : data) fmt::print("{:02x} ", c);
                         fmt::print("\n");
                 }
-            }
-            catch (const TimeoutException &e) {
+            } catch (const TimeoutException& e) {
                 msTimeout = 0;
             }
+
             if (msTimeout <= 0) {
                 msTimeout = TIMEOUT_MS;
                 authenticate(device);
