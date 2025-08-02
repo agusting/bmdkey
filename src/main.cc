@@ -38,7 +38,7 @@ static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x07, {XK_F7, false} }, /* IN */
     {0x08, {XK_F8, false} }, /* OUT */
     {0x09, {XK_F9, false} }, /* TRIM IN */
-    {0x0a, {XK_Up, true}}, /* TRIM OUT */
+    {0x0a, {XK_Up, false}}, /* TRIM OUT */
     {0x0b, {XK_F11, false}}, /* ROLL */
     {0x0c, {XK_Left, true}}, /* SLIP SRC */
     {0x0d, {XK_Down, false}}, /* SLIP DEST */
