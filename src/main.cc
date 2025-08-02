@@ -50,9 +50,9 @@ static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
 
     {0x1a, {XK_Alt_L, false}}, /* SOURCE */
     {0x1b, {XK_Control_L, false}}, /* TIMELINE */
-    {0x1c, {XK_F20, false}}, /* SHTL */
-    {0x1d, {XK_F21, false}}, /* JOG */
-    {0x1e, {XK_F22, false}}, /* SCRL */
+    {0x1c, {XK_Shift_L, false}}, /* SHTL */
+    {0x1d, {XK_Shift_L, false}}, /* JOG */
+    {0x1e, {XK_Shift_L, false}}, /* SCRL */
 
     {0x31, {XK_F1, true}  }, /* ESC */
     {0x1f, {XK_F2, true}  }, /* SYNC BIN */
