@@ -26,7 +26,7 @@ static int minKeycode;
 static int maxKeycode;
 static int lastModifiedKey = 0;
 
-/*static const std::vector<KeySym> MODIFIERS = {XK_Alt_L, XK_Meta_L, XK_Super_L}; */
+static const std::vector<KeySym> MODIFIERS = {XK_Alt_L, XK_Meta_L, XK_Super_L}; 
 
 static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x01, {XK_F1, false} }, /* SMART INSRT */
@@ -41,7 +41,7 @@ static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x0a, {XK_Up, true}}, /* TRIM OUT */
     {0x0b, {XK_F11, false}}, /* ROLL */
     {0x0c, {XK_Left, true}}, /* SLIP SRC */
-    {0x0d, {XK_Down, true}}, /* SLIP DEST */
+    {0x0d, {XK_Down, false}}, /* SLIP DEST */
     {0x0e, {XK_Right, true}}, /* TRANS DUR */
     {0x0f, {XK_F15, false}}, /* CUT */
     {0x10, {XK_F16, false}}, /* DIS */
