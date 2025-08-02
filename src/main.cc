@@ -41,23 +41,23 @@ static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x09, {XK_F9, false} }, /* TRIM IN */
     {0x0a, {XK_Up, false}}, /* TRIM OUT */
     {0x0b, {XK_F11, false}}, /* ROLL */
-    {0x0c, {XK_KP_4, false}}, /* SLIP SRC */
-    {0x0d, {XK_KP_5, false}}, /* SLIP DEST */
+    {0x0c, {XK_Left, false}}, /* SLIP SRC */
+    {0x0d, {XK_Down, false}}, /* SLIP DEST */
     {0x0e, {XK_Right, true}}, /* TRANS DUR */
     {0x0f, {XK_F15, false}}, /* CUT */
-    {0x10, {XK_F16, false}}, /* DIS */
-    {0x11, {XK_F17, false}}, /* SMTH CUT */
+    {0x10, {XK_Shift_L, false}}, /* DIS */
+    {0x11, {XK_KP_Space, false}}, /* SMTH CUT */
 
-    {0x1a, {XK_F18, false}}, /* SOURCE */
-    {0x1b, {XK_F19, false}}, /* TIMELINE */
+    {0x1a, {XK_Alt_L, false}}, /* SOURCE */
+    {0x1b, {XK_Control_L, false}}, /* TIMELINE */
     {0x1c, {XK_F20, false}}, /* SHTL */
     {0x1d, {XK_F21, false}}, /* JOG */
     {0x1e, {XK_F22, false}}, /* SCRL */
 
     {0x31, {XK_F1, true}  }, /* ESC */
     {0x1f, {XK_F2, true}  }, /* SYNC BIN */
-    {0x2c, {XK_F3, true}  }, /* AUDIO LEVEL */
-    {0x2d, {XK_F4, true}  }, /* FULL VIEW */
+    {0x2c, {XK_r, false}  }, /* AUDIO LEVEL */
+    {0x2d, {XK_Delete, false}  }, /* FULL VIEW */
     {0x22, {XK_F5, true}  }, /* TRANS */
     {0x2f, {XK_F6, true}  }, /* SPLIT */
     {0x2e, {XK_F7, true}  }, /* SNAP */
@@ -75,7 +75,7 @@ static const std::map<int, std::pair<KeySym, bool>> KEYMAP = {
     {0x2c, {XK_F19, true} }, /* LIVE O/WR */
     {0x25, {XK_F20, true} }, /* VIDEO ONLY */
     {0x26, {XK_F21, true} }, /* AUDIO ONLY */
-    {0x3c, {XK_F22, true} }, /* STOP/PLAY */
+    {0x3c, {XK_KP_Space, true} }, /* STOP/PLAY */
 };
 
 static void checkerror(int res)
