@@ -78,21 +78,29 @@ def connect_and_authenticate():
     dev.open(vid, pid)
     dev.set_nonblocking(False)
 
+    # Step 1: Send handshake initiation (request challenge)
+    print("Requesting challenge from device...")
+    req_packet = bytearray(64)
+    req_packet[0] = 0x02
+    req_packet[1] = 0x10
+    dev.write(req_packet)
+
+    # Step 2: Read challenge
     print("Reading challenge...")
     data = dev.read(64)
     if not data:
         raise RuntimeError("No data received from device")
 
-    # Challenge is usually in first 8 bytes, little-endian
     challenge_bytes = bytes(data[:8])
     challenge = int.from_bytes(challenge_bytes, "little")
     print(f"Challenge bytes : {challenge_bytes.hex()}")
     print(f"Challenge value : {challenge:016X}")
 
+    # Step 3: Calculate response
     response_value = calculateKeyboardResponse(challenge)
     response_bytes = response_value.to_bytes(8, "little")
 
-    # Packet format from bmd.py
+    # Step 4: Send response
     packet = bytearray(64)
     packet[0] = 0x02
     packet[1] = 0x10
@@ -102,7 +110,18 @@ def connect_and_authenticate():
     dev.write(packet)
 
     print("Authentication sent. Device should now start sending events.")
-    dev.close()
+
+    # Step 5: Read events
+    print("\nListening for events... (Press Ctrl+C to exit)")
+    try:
+        while True:
+            event = dev.read(64)
+            if event:
+                print(f"Event: {event}")
+    except KeyboardInterrupt:
+        print("Exiting.")
+    finally:
+        dev.close()
 
 if __name__ == "__main__":
     connect_and_authenticate()
