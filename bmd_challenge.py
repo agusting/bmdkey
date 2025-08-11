@@ -59,37 +59,40 @@ def calculateKeyboardResponse(challenge):
     print(f"Final response  : {response:016X}")
     return response
 
+def find_speed_editor():
+    """Find Blackmagic Speed Editor HID device by name."""
+    for dev in hid.enumerate():
+        product = dev.get("product_string", "") or ""
+        vendor_id = dev.get("vendor_id")
+        product_id = dev.get("product_id")
+        if "speed editor" in product.lower():
+            print(f"Found Speed Editor: VID={vendor_id:04X}, PID={product_id:04X}")
+            return vendor_id, product_id
+    raise RuntimeError("Blackmagic Speed Editor not found")
 
 def connect_and_authenticate():
-    # Vendor/Product ID for the Blackmagic Speed Editor
-    VID = 0x1edb
-    PID = 0xda0e
+    vid, pid = find_speed_editor()
 
     print("Opening HID device...")
     dev = hid.device()
-    dev.open(VID, PID)
-
-    # This should match the report size used by bmd.py (usually 64 bytes)
-    dev.set_nonblocking(True)
+    dev.open(vid, pid)
+    dev.set_nonblocking(False)
 
     print("Reading challenge...")
     data = dev.read(64)
     if not data:
         raise RuntimeError("No data received from device")
 
-    # Challenge is usually in the first 8 bytes (little-endian)
-    challenge_bytes = data[:8]
+    # Challenge is usually in first 8 bytes, little-endian
+    challenge_bytes = bytes(data[:8])
     challenge = int.from_bytes(challenge_bytes, "little")
     print(f"Challenge bytes : {challenge_bytes.hex()}")
     print(f"Challenge value : {challenge:016X}")
 
-    # Calculate response
     response_value = calculateKeyboardResponse(challenge)
     response_bytes = response_value.to_bytes(8, "little")
 
-    # Build the response packet (from bmd.py handshake)
-    # Usually: [0x02, 0x10, <8-byte response>, zeros...]
-    # This may vary, so check your reference script
+    # Packet format from bmd.py
     packet = bytearray(64)
     packet[0] = 0x02
     packet[1] = 0x10
@@ -99,9 +102,7 @@ def connect_and_authenticate():
     dev.write(packet)
 
     print("Authentication sent. Device should now start sending events.")
-
     dev.close()
-
 
 if __name__ == "__main__":
     connect_and_authenticate()
