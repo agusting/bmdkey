@@ -7,53 +7,40 @@ from pynput.keyboard import Controller as KeyboardController, Key
 from pynput.mouse import Controller as MouseController, Button
 
 # ==================================================================================
-# STEP 1: DEFINE YOUR CUSTOM KEY MAP
+# STEP 1: VERIFY YOUR PRODUCT ID
+#
+# Find your Product ID using the steps above and enter it here.
+# The value must be an integer. 'BD3D' becomes 0xBD3D.
+#
+# ==================================================================================
+# Common Speed Editor PID. Change this if your device is different.
+YOUR_PRODUCT_ID = 0xBD3D
+
+
+# ==================================================================================
+# STEP 2: DEFINE YOUR CUSTOM KEY MAP
 #
 # This is where you define what each button on the Speed Editor should do.
-#
-# - The 'key' is the button on the Speed Editor (e.g., SpeedEditorKey.SMART_INSRT).
-# - The 'value' is a dictionary defining the action.
-#
-# Supported Action Types:
-#   - {'type': 'key', 'action': Key.f5}:         Presses a single special key.
-#   - {'type': 'key', 'action': 'p'}:            Presses a single character key.
-#   - {'type': 'combo', 'action': [{Key.ctrl, 's'}]}: Presses a key combination.
-#   - {'type': 'string', 'action': 'Hello!'}:    Types out a string of text.
-#   - {'type': 'mouse_click', 'action': Button.left}: Simulates a mouse click.
-#
 # ==================================================================================
 
 KEY_MAP = {
     # --- Example Mappings ---
-
-    # Make the 'SMART INSRT' button act as the F5 key
     'SMART_INSRT': {'type': 'key', 'action': Key.f5},
-
-    # Make the 'APPND' button type out a custom string
-    'APPND': {'type': 'string', 'action': 'This is my custom text!'},
-
-    # Make the 'RIPL OWR' button simulate a right mouse click
-    'RIPL_OWR': {'type': 'mouse_click', 'action': Button.right},
-
-    # Make the 'CLOSE UP' button perform a 'Ctrl+C' (Copy)
-    'CLOSE_UP': {'type': 'combo', 'action': [Key.ctrl, 'c']},
-    
-    # Make the 'PLACE ON TOP' button perform a 'Ctrl+V' (Paste)
-    'PLACE_ON_TOP': {'type': 'combo', 'action': [Key.ctrl, 'v']},
+    'APPND':       {'type': 'string', 'action': 'This is my custom text!'},
+    'RIPL_OWR':    {'type': 'mouse_click', 'action': Button.right},
+    'CLOSE_UP':    {'type': 'combo', 'action': [Key.ctrl, 'c']},
+    'PLACE_ON_TOP':{'type': 'combo', 'action': [Key.ctrl, 'v']},
 
     # --- Add Your Own Mappings Below ---
-
-    'CAM1': {'type': 'key', 'action': '1'},
-    'CAM2': {'type': 'key', 'action': '2'},
-    'CAM3': {'type': 'key', 'action': '3'},
-    'SPLIT': {'type': 'string', 'action': 'Split command executed.'},
-    'SNAP': {'type': 'key', 'action': Key.enter},
-
+    'CAM1':        {'type': 'key', 'action': '1'},
+    'CAM2':        {'type': 'key', 'action': '2'},
+    'CAM3':        {'type': 'key', 'action': '3'},
+    'SPLIT':       {'type': 'string', 'action': 'Split command executed.'},
+    'SNAP':        {'type': 'key', 'action': Key.enter},
 }
 
 # ==================================================================================
 #
-#       CODE FROM https://github.com/smunaut/blackmagic-misc
 #       (No need to modify anything below this line)
 #
 # ==================================================================================
@@ -76,16 +63,10 @@ def bmd_kbd_auth(challenge):
 
 # --- Device communication class ---
 class SpeedEditor:
-    USB_VID=0x1edb;USB_PID=0xda0e # Original PID was 0xda0e, but Speed Editor is often 0xbd3d
-    
-    def __init__(self):
-        try:
-            # First try the common Speed Editor PID
-            self.dev = hid.Device(self.USB_VID, 0xbd3d)
-        except hid.HIDException:
-            # Fallback to the PID from the script
-            print("Could not find Speed Editor with PID 0xbd3d, trying 0xda0e...")
-            self.dev = hid.Device(self.USB_VID, self.USB_PID)
+    USB_VID=0x1edb
+
+    def __init__(self, pid):
+        self.dev = hid.Device(self.USB_VID, pid) # This will raise HIDException if it fails
 
     def authenticate(self):
         self.dev.send_feature_report(b'\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00')
@@ -102,9 +83,8 @@ class SpeedEditor:
         return int.from_bytes(data[2:4],'little')
 
     def read_keys(self):
-        report = self.dev.read(64, timeout=50) # 50ms timeout
-        if not report or report[0] != 4:
-            return []
+        report = self.dev.read(64, timeout=50)
+        if not report or report[0] != 4: return []
         keys = [SpeedEditorKey(k) for k in struct.unpack('<6H', report[1:13]) if k != 0]
         return keys
 
@@ -114,49 +94,43 @@ def main():
     mouse = MouseController()
     
     try:
-        print("Attempting to connect to the Blackmagic Speed Editor...")
-        se = SpeedEditor()
+        print(f"Attempting to connect to Speed Editor (PID: {hex(YOUR_PRODUCT_ID)})...")
+        se = SpeedEditor(pid=YOUR_PRODUCT_ID)
+        
         print("Device found. Authenticating...")
         se.authenticate()
+        
         print("Authentication successful! Listening for key presses...")
         print("(Press Ctrl+C in this window to exit the script)")
 
         last_keys = []
         while True:
             current_keys = se.read_keys()
-            
-            # Check for newly pressed keys
             pressed_keys = [k for k in current_keys if k not in last_keys]
 
             for key in pressed_keys:
                 key_name = key.name
-                print(f"Key Pressed: {key_name}")
-                
                 if key_name in KEY_MAP:
                     mapping = KEY_MAP[key_name]
                     action_type = mapping.get('type')
                     action = mapping.get('action')
-                    
-                    print(f"  -> Action: {mapping}")
-
-                    if action_type == 'key':
-                        keyboard.press(action)
-                        keyboard.release(action)
-                    elif action_type == 'string':
-                        keyboard.type(action)
-                    elif action_type == 'mouse_click':
-                        mouse.click(action)
+                    print(f"Key: {key_name:<12} -> Action: {mapping}")
+                    if action_type == 'key': keyboard.press(action); keyboard.release(action)
+                    elif action_type == 'string': keyboard.type(action)
+                    elif action_type == 'mouse_click': mouse.click(action)
                     elif action_type == 'combo':
                         with keyboard.pressed(*action[:-1]):
-                            keyboard.press(action[-1])
-                            keyboard.release(action[-1])
-
+                            keyboard.press(action[-1]); keyboard.release(action[-1])
             last_keys = current_keys
-            time.sleep(0.01) # Small delay to prevent high CPU usage
+            time.sleep(0.01)
 
     except hid.HIDException:
-        print("\nERROR: Speed Editor not found.")
-        print("Please ensure the device is connected and no other program (like DaVinci Resolve) is using it.")
+        print("\nERROR: FAILED TO CONNECT TO SPEED EDITOR.")
+        print("Please check the following:")
+        print("  1. Is the Product ID in the script correct? Use the diagnostic script to check.")
+        print("  2. Is DaVinci Resolve or other Blackmagic software completely closed?")
+        print("  3. Is the device securely plugged in?")
+        print("  4. Try running this script from a Command Prompt with 'Run as administrator'.")
     except RuntimeError as e:
         print(f"\nERROR: An error occurred during authentication: {e}")
     except KeyboardInterrupt:
